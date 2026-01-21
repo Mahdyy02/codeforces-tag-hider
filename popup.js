@@ -1,5 +1,6 @@
 // State management
 let tagsHidden = true; // Default state
+let currentTabId = null;
 
 // DOM elements
 const toggleButton = document.getElementById('toggleTags');
@@ -13,8 +14,9 @@ async function init() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
     if (tab && isCFProblemPage(tab.url)) {
+        currentTabId = tab.id;
         updateUI('ready');
-        // Load saved state
+        // Load saved state - use correct storage key
         loadState(tab.id);
     } else {
         updateUI('not-cf');
@@ -25,8 +27,9 @@ async function init() {
 function isCFProblemPage(url) {
     if (!url) return false;
     const cfPatterns = [
-        /codeforces\.com\/contest\/\d+\/problem\/[A-Z]/i,
-        /codeforces\.com\/problemset\/problem\/\d+\/[A-Z]/i
+        /codeforces\.com\/contest\/\d+\/problem\/[A-Z0-9]+/i,
+        /codeforces\.com\/problemset\/problem\/\d+\/[A-Z0-9]+/i,
+        /codeforces\.com\/gym\/\d+\/problem\/[A-Z0-9]+/i
     ];
     return cfPatterns.some(pattern => pattern.test(url));
 }
@@ -61,14 +64,19 @@ function updateUI(state) {
         case 'toggling':
             statusValue.textContent = 'Toggling...';
             break;
+        case 'error':
+            statusCard.className = 'status-card disabled';
+            statusValue.textContent = 'Please refresh the page';
+            break;
     }
 }
 
-// Load state from storage
+// Load state from storage - use correct key matching content.js
 async function loadState(tabId) {
     try {
-        const result = await chrome.storage.local.get([`tagsHidden_${tabId}`]);
-        const hidden = result[`tagsHidden_${tabId}`] !== false; // Default to hidden
+        // Use the same storage key as content.js
+        const result = await chrome.storage.local.get([`problemPageTagsHidden_${tabId}`]);
+        const hidden = result[`problemPageTagsHidden_${tabId}`] !== false; // Default to hidden
         updateUI(hidden ? 'hidden' : 'visible');
     } catch (error) {
         console.error('Error loading state:', error);
@@ -76,10 +84,11 @@ async function loadState(tabId) {
     }
 }
 
-// Save state to storage
+// Save state to storage - use correct key matching content.js
 async function saveState(tabId, hidden) {
     try {
-        await chrome.storage.local.set({ [`tagsHidden_${tabId}`]: hidden });
+        // Use the same storage key as content.js
+        await chrome.storage.local.set({ [`problemPageTagsHidden_${tabId}`]: hidden });
     } catch (error) {
         console.error('Error saving state:', error);
     }
@@ -96,24 +105,40 @@ toggleButton.addEventListener('click', async () => {
     updateUI('toggling');
 
     try {
-        // Send message to content script
-        await chrome.tabs.sendMessage(tab.id, { action: 'toggleTags' });
+        // Send message to content script with timeout
+        const response = await Promise.race([
+            chrome.tabs.sendMessage(tab.id, { action: 'toggleTags' }),
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Timeout - content script not responding')), 1000)
+            )
+        ]);
         
-        // Toggle state
-        const newState = !tagsHidden;
-        
-        // Save state
-        await saveState(tab.id, newState);
-        
-        // Update UI with new state
-        setTimeout(() => {
-            updateUI(newState ? 'hidden' : 'visible');
-        }, 150);
+        // Don't manually toggle state here - wait for storage change event
+        // The content script will update storage and we'll get notified
         
     } catch (error) {
-        console.error('Error toggling tags:', error);
-        // Revert to previous state
-        updateUI(tagsHidden ? 'hidden' : 'visible');
+        console.log('Content script not ready:', error.message);
+        
+        // Show helpful error message
+        updateUI('error');
+        
+        // Revert to previous state after 2 seconds
+        setTimeout(() => {
+            updateUI(tagsHidden ? 'hidden' : 'visible');
+        }, 2000);
+    }
+});
+
+// Listen for storage changes from content script
+chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'local' && currentTabId) {
+        const storageKey = `problemPageTagsHidden_${currentTabId}`;
+        
+        if (changes[storageKey]) {
+            const newValue = changes[storageKey].newValue;
+            console.log('Popup: Storage changed, updating UI:', newValue);
+            updateUI(newValue ? 'hidden' : 'visible');
+        }
     }
 });
 
