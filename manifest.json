@@ -1,0 +1,48 @@
+{
+  "name": "TagHider - Codeforces Practice Mode",
+  "version": "2.0.0",
+  "description": "Hide problem tags on Codeforces to practice without spoilers. Focus on problem-solving without knowing the category.",
+  "manifest_version": 3,
+
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+
+  "host_permissions": [
+    "*://*.codeforces.com/*"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.codeforces.com/contest/*/problem/*",
+        "*://*.codeforces.com/problemset/problem/*/*",
+        "*://*.codeforces.com/gym/*/problem/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "background": {
+    "service_worker": "background.js"
+  }
+}
