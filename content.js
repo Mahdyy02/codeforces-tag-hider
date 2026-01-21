@@ -1,41 +1,67 @@
 // State management
-let tagsHidden = true;
+let problemPageTagsHidden = true;
+let problemsetListTagsHidden = true;
 let tagBox = null;
+let problemsetTags = [];
 let isInitialized = false;
 
 // Configuration
 const CONFIG = {
     animationDuration: 300,
     selectors: {
-        // Primary selectors for tag box
         tagBoxClass: 'roundbox.sidebox',
         captionText: '→ Problem tags',
         tagClass: 'tag-box'
     }
 };
 
-// Find tag box using multiple methods
+// Detect current page type
+function getPageType() {
+    const path = window.location.pathname;
+    
+    // Check for individual problem page
+    // Formats:
+    // - /contest/1234/problem/A
+    // - /problemset/problem/2185/H  (problemset has different structure!)
+    // - /gym/567890/problem/B1
+    if (/\/contest\/\d+\/problem\/[A-Z0-9]+/i.test(path) ||
+        /\/problemset\/problem\/\d+\/[A-Z0-9]+/i.test(path) ||
+        /\/gym\/\d+\/problem\/[A-Z0-9]+/i.test(path)) {
+        return 'problem';
+    }
+    
+    // Check for problemset list
+    if (path === '/problemset' || path.startsWith('/problemset?')) {
+        return 'problemset-list';
+    }
+    
+    return 'unknown';
+}
+
+// ============================================
+// PROBLEM PAGE FUNCTIONALITY
+// ============================================
+
 function findTagBox() {
-    // Method 1: Find by caption text "→ Problem tags"
+    // Method 1: Find by caption text
     const allDivs = document.querySelectorAll('.roundbox.sidebox');
     for (const div of allDivs) {
         const caption = div.querySelector('.caption.titled');
         if (caption && caption.textContent.includes('→ Problem tags')) {
-            console.log('TagHider: Found tag box by caption text');
+            console.log('TagHider: Found tag box by caption');
             return div;
         }
     }
     
-    // Method 2: Find by tag-box class inside
+    // Method 2: Find by tag-box class
     const tagBoxElements = document.querySelectorAll('.tag-box');
     if (tagBoxElements.length > 0) {
-        // Find the parent roundbox sidebox
         let parent = tagBoxElements[0].parentElement;
         while (parent && !parent.classList.contains('sidebox')) {
             parent = parent.parentElement;
         }
         if (parent) {
-            console.log('TagHider: Found tag box by tag-box elements');
+            console.log('TagHider: Found tag box by elements');
             return parent;
         }
     }
@@ -53,140 +79,10 @@ function findTagBox() {
         }
     }
     
-    // Method 4: XPath fallback
-    const xpaths = [
-        "//div[contains(@class, 'roundbox') and contains(@class, 'sidebox')]//div[contains(text(), 'Problem tags')]/..",
-        "//div[contains(@class, 'roundbox') and contains(@class, 'sidebox')][.//span[contains(@class, 'tag-box')]]"
-    ];
-    
-    for (const xpath of xpaths) {
-        const result = document.evaluate(
-            xpath,
-            document,
-            null,
-            XPathResult.FIRST_ORDERED_NODE_TYPE,
-            null
-        );
-        
-        if (result.singleNodeValue) {
-            console.log('TagHider: Found tag box by XPath');
-            return result.singleNodeValue;
-        }
-    }
-    
-    console.log('TagHider: Tag box not found with any method');
+    console.log('TagHider: Tag box not found');
     return null;
 }
 
-// Add smooth animation styles
-function injectStyles() {
-    if (document.getElementById('taghider-styles')) return;
-    
-    const style = document.createElement('style');
-    style.id = 'taghider-styles';
-    style.textContent = `
-        .taghider-hidden {
-            display: none !important;
-        }
-        
-        .taghider-visible {
-            display: block !important;
-            animation: taghider-fadeIn ${CONFIG.animationDuration}ms ease !important;
-        }
-        
-        @keyframes taghider-fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        /* Premium badge button */
-        .taghider-badge-btn {
-            background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
-            color: white !important;
-            padding: 10px 20px !important;
-            border-radius: 24px !important;
-            font-size: 14px !important;
-            font-weight: 600 !important;
-            z-index: 1000 !important;
-            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35) !important;
-            cursor: pointer !important;
-            user-select: none !important;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-            border: none !important;
-        }
-        
-        .taghider-badge-btn:hover {
-            background: linear-gradient(135deg, #2563eb, #1e40af) !important;
-            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.45) !important;
-            transform: translateY(-2px) !important;
-        }
-        
-        .taghider-badge-btn:active {
-            transform: translateY(0px) scale(0.98) !important;
-            box-shadow: 0 2px 10px rgba(59, 130, 246, 0.35) !important;
-        }
-        
-        .taghider-badge-btn svg {
-            flex-shrink: 0 !important;
-            stroke-width: 2.5 !important;
-        }
-        
-        /* Placeholder styling */
-        .taghider-placeholder {
-            padding: 0 !important;
-            background: white !important;
-            border: 1px solid #e0e0e0 !important;
-            border-radius: 8px !important;
-            margin: 10px 0 !important;
-            animation: taghider-fadeIn ${CONFIG.animationDuration}ms ease !important;
-        }
-        
-        .taghider-placeholder .caption.titled {
-            padding: 8px 12px !important;
-            border-bottom: 1px solid #e0e0e0 !important;
-            font-weight: 600 !important;
-            font-size: 13px !important;
-        }
-    `;
-    document.head.appendChild(style);
-    
-    console.log('TagHider: Styles injected');
-}
-
-// Remove hidden badge
-function removeHiddenBadge() {
-    const badge = document.querySelector('.taghider-badge');
-    if (badge) {
-        badge.style.opacity = '0';
-        setTimeout(() => badge.remove(), 200);
-    }
-}
-
-// Hide tags with smooth animation
-function hideTags() {
-    if (!tagBox) return;
-    
-    // Hide the entire tag box
-    tagBox.classList.remove('taghider-visible');
-    tagBox.classList.add('taghider-hidden');
-    
-    // Add a placeholder to show where tags are
-    addPlaceholder();
-    
-    tagsHidden = true;
-    saveState();
-    
-    console.log('TagHider: Tags hidden');
-}
-
-// Add placeholder when tags are hidden
 function addPlaceholder() {
     if (!tagBox || document.querySelector('.taghider-placeholder')) return;
     
@@ -208,7 +104,6 @@ function addPlaceholder() {
         </div>
     `;
     
-    // Make badge clickable
     const badge = placeholder.querySelector('.taghider-badge-btn');
     badge.style.cursor = 'pointer';
     badge.addEventListener('click', (e) => {
@@ -216,84 +111,261 @@ function addPlaceholder() {
         toggleTags();
     });
     
-    // Insert placeholder after the hidden tag box
     tagBox.parentNode.insertBefore(placeholder, tagBox.nextSibling);
-    
     console.log('TagHider: Placeholder added');
 }
 
-// Remove placeholder
 function removePlaceholder() {
     const placeholder = document.querySelector('.taghider-placeholder');
     if (placeholder) {
         placeholder.remove();
-        console.log('TagHider: Placeholder removed');
     }
 }
 
-// Show tags with smooth animation
-function showTags() {
+function hideProblemTags() {
     if (!tagBox) return;
-    
-    // Remove placeholder
+    tagBox.classList.remove('taghider-visible');
+    tagBox.classList.add('taghider-hidden');
+    addPlaceholder();
+    console.log('TagHider: Problem tags hidden');
+}
+
+function showProblemTags() {
+    if (!tagBox) return;
     removePlaceholder();
-    
-    // Show the entire tag box
     tagBox.classList.remove('taghider-hidden');
     tagBox.classList.add('taghider-visible');
-    
-    removeHiddenBadge();
-    tagsHidden = false;
-    saveState();
-    
-    console.log('TagHider: Tags shown');
+    console.log('TagHider: Problem tags shown');
 }
 
-// Toggle tags
+// ============================================
+// PROBLEMSET LIST FUNCTIONALITY
+// ============================================
+
+function findProblemsetTags() {
+    const tags = [];
+    const rightFloatDivs = document.querySelectorAll('div[style*="float: right"]');
+    
+    rightFloatDivs.forEach(div => {
+        const hasTagLinks = div.querySelector('a[href*="tags="]');
+        if (hasTagLinks && !tags.includes(div)) {
+            tags.push(div);
+        }
+    });
+    
+    console.log(`TagHider: Found ${tags.length} tag containers`);
+    return tags;
+}
+
+function addProblemsetToggle() {
+    const existing = document.querySelector('.taghider-problemset-toggle');
+    if (existing) existing.remove();
+    
+    const table = document.querySelector('.problems');
+    if (!table) return;
+    
+    const headerRow = table.querySelector('tr');
+    if (!headerRow) return;
+    
+    const headers = headerRow.querySelectorAll('th');
+    const nameHeader = headers[1];
+    if (!nameHeader) return;
+    
+    const toggleContainer = document.createElement('div');
+    toggleContainer.style.float = 'right';
+    toggleContainer.style.marginLeft = '10px';
+    
+    const toggle = document.createElement('span');
+    toggle.className = 'taghider-problemset-toggle';
+    toggle.textContent = problemsetListTagsHidden ? 'show' : 'hide';
+    toggle.title = 'Toggle tag visibility';
+    
+    toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleTags();
+    });
+    
+    toggleContainer.appendChild(toggle);
+    nameHeader.appendChild(toggleContainer);
+    console.log('TagHider: Toggle button added');
+}
+
+function hideProblemsetTags() {
+    problemsetTags.forEach(container => {
+        container.classList.add('taghider-problemset-tag-hidden');
+    });
+    
+    const toggle = document.querySelector('.taghider-problemset-toggle');
+    if (toggle) toggle.textContent = 'show';
+    console.log('TagHider: Problemset tags hidden');
+}
+
+function showProblemsetTags() {
+    problemsetTags.forEach(container => {
+        container.classList.remove('taghider-problemset-tag-hidden');
+    });
+    
+    const toggle = document.querySelector('.taghider-problemset-toggle');
+    if (toggle) toggle.textContent = 'hide';
+    console.log('TagHider: Problemset tags shown');
+}
+
+// ============================================
+// SHARED FUNCTIONALITY
+// ============================================
+
+function injectStyles() {
+    if (document.getElementById('taghider-styles')) return;
+    
+    const style = document.createElement('style');
+    style.id = 'taghider-styles';
+    style.textContent = `
+        .taghider-hidden { display: none !important; }
+        .taghider-visible { display: block !important; animation: taghider-fadeIn 300ms ease !important; }
+        
+        @keyframes taghider-fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .taghider-badge-btn {
+            background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+            color: white !important;
+            padding: 10px 20px !important;
+            border-radius: 24px !important;
+            font-size: 14px !important;
+            font-weight: 600 !important;
+            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35) !important;
+            cursor: pointer !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            border: none !important;
+        }
+        
+        .taghider-badge-btn:hover {
+            background: linear-gradient(135deg, #2563eb, #1e40af) !important;
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.45) !important;
+            transform: translateY(-2px) !important;
+        }
+        
+        .taghider-badge-btn:active {
+            transform: scale(0.98) !important;
+        }
+        
+        .taghider-placeholder {
+            padding: 0 !important;
+            background: white !important;
+            border: 1px solid #e0e0e0 !important;
+            border-radius: 8px !important;
+            margin: 10px 0 !important;
+        }
+        
+        .taghider-placeholder .caption.titled {
+            padding: 8px 12px !important;
+            border-bottom: 1px solid #e0e0e0 !important;
+            font-weight: 600 !important;
+        }
+        
+        .taghider-problemset-toggle {
+            display: inline-block !important;
+            padding: 3px 10px !important;
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            color: white !important;
+            background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+            border-radius: 12px !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+            box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3) !important;
+        }
+        
+        .taghider-problemset-toggle:hover {
+            background: linear-gradient(135deg, #2563eb, #1e40af) !important;
+            transform: translateY(-1px) !important;
+        }
+        
+        .taghider-problemset-tag-hidden { display: none !important; }
+    `;
+    document.head.appendChild(style);
+}
+
 function toggleTags() {
-    if (tagsHidden) {
-        showTags();
-    } else {
-        hideTags();
+    const pageType = getPageType();
+    
+    if (pageType === 'problem') {
+        if (problemPageTagsHidden) {
+            showProblemTags();
+            problemPageTagsHidden = false;
+        } else {
+            hideProblemTags();
+            problemPageTagsHidden = true;
+        }
+        console.log('TagHider: Problem page tags now', problemPageTagsHidden ? 'hidden' : 'visible');
+    } else if (pageType === 'problemset-list') {
+        if (problemsetListTagsHidden) {
+            showProblemsetTags();
+            problemsetListTagsHidden = false;
+        } else {
+            hideProblemsetTags();
+            problemsetListTagsHidden = true;
+        }
+        console.log('TagHider: Problemset list tags now', problemsetListTagsHidden ? 'hidden' : 'visible');
     }
+    
+    saveState();
 }
 
-// Save state to Chrome storage
 async function saveState() {
     try {
+        const pageType = getPageType();
         const tabId = await getCurrentTabId();
-        if (tabId) {
-            await chrome.storage.local.set({ [`tagsHidden_${tabId}`]: tagsHidden });
+        
+        if (!tabId) return;
+        
+        if (pageType === 'problem') {
+            await chrome.storage.local.set({ 
+                [`problemPageTagsHidden_${tabId}`]: problemPageTagsHidden 
+            });
+            console.log('TagHider: Problem page state saved:', problemPageTagsHidden);
+        } else if (pageType === 'problemset-list') {
+            // For problemset list, save globally (not per tab)
+            await chrome.storage.local.set({ 
+                'problemsetListTagsHidden': problemsetListTagsHidden 
+            });
+            console.log('TagHider: Problemset list state saved:', problemsetListTagsHidden);
         }
     } catch (error) {
         console.error('TagHider: Error saving state:', error);
     }
 }
 
-// Load state from Chrome storage
 async function loadState() {
     try {
+        const pageType = getPageType();
         const tabId = await getCurrentTabId();
-        if (tabId) {
-            const result = await chrome.storage.local.get([`tagsHidden_${tabId}`]);
-            tagsHidden = result[`tagsHidden_${tabId}`] !== false; // Default to hidden
+        
+        if (pageType === 'problem') {
+            if (tabId) {
+                const result = await chrome.storage.local.get([`problemPageTagsHidden_${tabId}`]);
+                problemPageTagsHidden = result[`problemPageTagsHidden_${tabId}`] !== false;
+                console.log('TagHider: Problem page state loaded:', problemPageTagsHidden);
+            }
+        } else if (pageType === 'problemset-list') {
+            const result = await chrome.storage.local.get(['problemsetListTagsHidden']);
+            problemsetListTagsHidden = result['problemsetListTagsHidden'] !== false;
+            console.log('TagHider: Problemset list state loaded:', problemsetListTagsHidden);
         }
     } catch (error) {
         console.error('TagHider: Error loading state:', error);
-        tagsHidden = true; // Default to hidden
+        problemPageTagsHidden = true;
+        problemsetListTagsHidden = true;
     }
 }
 
-// Get current tab ID
 function getCurrentTabId() {
     return new Promise((resolve) => {
         try {
             chrome.runtime.sendMessage({ action: 'getTabId' }, (response) => {
-                if (chrome.runtime.lastError) {
-                    resolve(null);
-                } else {
-                    resolve(response?.tabId || null);
-                }
+                resolve(response?.tabId || null);
             });
         } catch {
             resolve(null);
@@ -301,75 +373,124 @@ function getCurrentTabId() {
     });
 }
 
-// Initialize the extension
 async function init() {
     if (isInitialized) return;
     
-    tagBox = findTagBox();
+    const pageType = getPageType();
+    console.log('TagHider: Detected page type:', pageType);
     
-    if (!tagBox) {
-        console.log('TagHider: Tag box not found');
+    if (pageType === 'unknown') {
+        console.log('TagHider: Not a supported page');
         return;
     }
     
-    console.log('TagHider: Tag box found, initializing...');
-    
-    // Inject styles
     injectStyles();
-    
-    // Load saved state
     await loadState();
     
-    // Apply initial state
-    if (tagsHidden) {
-        hideTags();
-    } else {
-        showTags();
+    if (pageType === 'problem') {
+        tagBox = findTagBox();
+        if (!tagBox) {
+            console.log('TagHider: Tag box not found, will retry...');
+            return;
+        }
+        
+        if (problemPageTagsHidden) {
+            hideProblemTags();
+        } else {
+            showProblemTags();
+        }
+    } else if (pageType === 'problemset-list') {
+        // Wait a bit for table to load
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        problemsetTags = findProblemsetTags();
+        if (problemsetTags.length === 0) {
+            console.log('TagHider: No tags found yet, will retry...');
+            return;
+        }
+        
+        addProblemsetToggle();
+        
+        if (problemsetListTagsHidden) {
+            hideProblemsetTags();
+        } else {
+            showProblemsetTags();
+        }
     }
     
     isInitialized = true;
-    console.log('TagHider: Initialized successfully');
+    console.log('TagHider: Initialized');
 }
 
-// Watch for DOM changes (for dynamic content loading)
 const observer = new MutationObserver((mutations) => {
-    if (!isInitialized) {
+    const pageType = getPageType();
+    
+    // For problem pages, only initialize once
+    if (pageType === 'problem' && !isInitialized) {
         init();
+        return;
+    }
+    
+    // For problemset list, check if table was modified
+    if (pageType === 'problemset-list') {
+        const tableModified = mutations.some(mutation => {
+            // Check if problems table was added or modified
+            if (mutation.target.classList && mutation.target.classList.contains('problems')) {
+                return true;
+            }
+            for (const node of mutation.addedNodes) {
+                if (node.nodeType === 1) {
+                    if (node.classList && node.classList.contains('problems')) {
+                        return true;
+                    }
+                    if (node.querySelector && node.querySelector('.problems')) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        });
+        
+        if (!isInitialized) {
+            init();
+        } else if (tableModified) {
+            console.log('TagHider: Table updated, re-finding tags...');
+            problemsetTags = findProblemsetTags();
+            addProblemsetToggle();
+            if (problemsetListTagsHidden) {
+                hideProblemsetTags();
+            }
+        }
     }
 });
 
-// Start observing
-observer.observe(document.body, {
-    childList: true,
-    subtree: true
-});
+observer.observe(document.body, { childList: true, subtree: true });
 
-// Listen for messages from popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'toggleTags') {
-        if (!isInitialized) {
-            init();
-        }
+        if (!isInitialized) init();
         toggleTags();
-        sendResponse({ success: true, tagsHidden });
+        
+        const pageType = getPageType();
+        const currentState = pageType === 'problem' ? problemPageTagsHidden : problemsetListTagsHidden;
+        sendResponse({ success: true, tagsHidden: currentState });
     }
     return true;
 });
 
-// Initialize when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
 } else {
     init();
 }
 
-// Re-initialize on page navigation (for single-page app behavior)
 window.addEventListener('popstate', () => {
     isInitialized = false;
+    tagBox = null;
+    problemsetTags = [];
     setTimeout(init, 500);
 });
 
-// Clean up on page unload
 window.addEventListener('beforeunload', () => {
     observer.disconnect();
 });

@@ -18,7 +18,8 @@
       "matches": [
         "*://*.codeforces.com/contest/*/problem/*",
         "*://*.codeforces.com/problemset/problem/*/*",
-        "*://*.codeforces.com/gym/*/problem/*"
+        "*://*.codeforces.com/gym/*/problem/*",
+        "*://*.codeforces.com/problemset*"
       ],
       "js": ["content.js"],
       "run_at": "document_end"
