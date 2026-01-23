@@ -31,7 +31,10 @@ function getPageType() {
     }
     
     // Check for problemset list
-    if (path === '/problemset' || path.startsWith('/problemset?')) {
+    // Matches: /problemset, /problemset?..., /problemset/page/1, /problemset/page/2?...
+    if (path === '/problemset' || 
+        path.startsWith('/problemset?') ||
+        /^\/problemset\/page\/\d+/.test(path)) {
         return 'problemset-list';
     }
     
